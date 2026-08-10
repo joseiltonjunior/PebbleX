@@ -1,0 +1,25 @@
+# Build output
+[Bb]in/
+[Oo]bj/
+[Dd]ebug/
+[Rr]elease/
+artifacts/
+TestResults/
+
+# Visual Studio and VS Code
+.vs/
+.vscode/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Temporary files
+*.log
+*.tmp
+*.swp
+
+# Windows Explorer
+Thumbs.db
+Desktop.ini
+$RECYCLE.BIN/
