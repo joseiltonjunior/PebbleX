@@ -17,6 +17,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\PebbleX.Windows\PebbleX.Windows.csproj" />
+    <ProjectReference Include="..\..\src\PebbleX.Cli\PebbleX.Cli.csproj" />
   </ItemGroup>
 
 </Project>

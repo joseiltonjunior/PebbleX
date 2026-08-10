@@ -23,6 +23,7 @@ public sealed class HidCollectionEnumerator
         ushort? productId = null;
         ushort? usagePage = null;
         ushort? usage = null;
+        ushort? inputReportByteLength = null;
         string? manufacturer = null;
         string? product = null;
         string? serialNumber = null;
@@ -54,6 +55,7 @@ public sealed class HidCollectionEnumerator
                     {
                         usagePage = capabilities.UsagePage;
                         usage = capabilities.Usage;
+                        inputReportByteLength = capabilities.InputReportByteLength;
                     }
                 }
                 finally
@@ -69,7 +71,7 @@ public sealed class HidCollectionEnumerator
             productId,
             usagePage,
             usage,
-            manufacturer,
+            inputReportByteLength,            manufacturer,
             product,
             serialNumber,
             deviceInterface.DeviceInstanceId,
