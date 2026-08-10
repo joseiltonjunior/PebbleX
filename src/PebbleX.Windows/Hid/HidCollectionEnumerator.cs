@@ -9,7 +9,7 @@ public sealed class HidCollectionEnumerator
     public IReadOnlyList<HidCollectionInfo> Enumerate()
     {
         var interfaceClassGuid = HidNative.GetInterfaceClassGuid();
-        var collections = HidNative.GetPresentInterfacePaths(interfaceClassGuid)
+        var collections = HidNative.GetPresentHidInterfaces(interfaceClassGuid)
             .Select(CreateCollectionInfo)
             .OrderBy(collection => collection.DevicePath, StringComparer.Ordinal)
             .ToArray();
@@ -17,14 +17,17 @@ public sealed class HidCollectionEnumerator
         return collections;
     }
 
-    private static HidCollectionInfo CreateCollectionInfo(string devicePath)
+    private static HidCollectionInfo CreateCollectionInfo(HidDeviceInterface deviceInterface)
     {
         ushort? vendorId = null;
         ushort? productId = null;
         ushort? usagePage = null;
         ushort? usage = null;
+        string? manufacturer = null;
+        string? product = null;
+        string? serialNumber = null;
 
-        using SafeFileHandle handle = HidNative.OpenForDeviceQuery(devicePath);
+        using SafeFileHandle handle = HidNative.OpenForDeviceQuery(deviceInterface.DevicePath);
 
         if (!handle.IsInvalid)
         {
@@ -38,6 +41,10 @@ public sealed class HidCollectionEnumerator
                 vendorId = attributes.VendorId;
                 productId = attributes.ProductId;
             }
+
+            manufacturer = HidNative.TryGetManufacturerString(handle);
+            product = HidNative.TryGetProductString(handle);
+            serialNumber = HidNative.TryGetSerialNumberString(handle);
 
             if (HidNative.TryGetPreparsedData(handle, out var preparsedData))
             {
@@ -56,6 +63,17 @@ public sealed class HidCollectionEnumerator
             }
         }
 
-        return new HidCollectionInfo(devicePath, vendorId, productId, usagePage, usage);
+        return new HidCollectionInfo(
+            deviceInterface.DevicePath,
+            vendorId,
+            productId,
+            usagePage,
+            usage,
+            manufacturer,
+            product,
+            serialNumber,
+            deviceInterface.DeviceInstanceId,
+            deviceInterface.ParentDeviceInstanceId,
+            deviceInterface.DeviceContainerId);
     }
 }

@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Runtime.InteropServices;
 using Microsoft.Win32.SafeHandles;
 
@@ -7,11 +8,20 @@ internal static partial class HidNative
 {
     private const uint CrSuccess = 0;
     private const uint CrBufferSmall = 26;
-    private const uint CmGetDeviceInterfaceListPresent = 0;
+    private const uint CmLocateDevNodeNormal = 0;
+    private const uint DigcfPresent = 0x00000002;
+    private const uint DigcfDeviceInterface = 0x00000010;
     private const uint FileShareRead = 0x00000001;
     private const uint FileShareWrite = 0x00000002;
     private const uint OpenExisting = 3;
+    private const uint ErrorInsufficientBuffer = 122;
+    private const uint ErrorNoMoreItems = 259;
+    private const uint DevPropTypeGuid = 0x0000000D;
     private const int HidpStatusSuccess = 0x00110000;
+    private const uint HidStringBufferLengthInBytes = 1024;
+    private static readonly DevPropKey DeviceContainerIdProperty = new(
+        new Guid("8C7ED206-3F8A-4827-B3AB-AE9E1FAEFC6C"),
+        2);
 
     internal static Guid GetInterfaceClassGuid()
     {
@@ -19,46 +29,44 @@ internal static partial class HidNative
         return interfaceClassGuid;
     }
 
-    internal static IReadOnlyList<string> GetPresentInterfacePaths(Guid interfaceClassGuid)
+    internal static IReadOnlyList<HidDeviceInterface> GetPresentHidInterfaces(Guid interfaceClassGuid)
     {
-        for (var attempt = 0; attempt < 3; attempt++)
+        using var deviceInfoSet = SafeDeviceInfoSetHandle.FromRawHandle(SetupDiGetClassDevs(
+            in interfaceClassGuid,
+            null,
+            IntPtr.Zero,
+            DigcfPresent | DigcfDeviceInterface));
+
+        if (deviceInfoSet.IsInvalid)
         {
-            var sizeResult = CM_Get_Device_Interface_List_Size(
-                out var characterCount,
-                in interfaceClassGuid,
-                null,
-                CmGetDeviceInterfaceListPresent);
-
-            if (sizeResult != CrSuccess)
-            {
-                throw new InvalidOperationException($"CM_Get_Device_Interface_List_SizeW failed with CONFIGRET {sizeResult}.");
-            }
-
-            if (characterCount == 0)
-            {
-                return Array.Empty<string>();
-            }
-
-            var buffer = new char[checked((int)characterCount)];
-            var listResult = CM_Get_Device_Interface_List(
-                in interfaceClassGuid,
-                null,
-                buffer,
-                characterCount,
-                CmGetDeviceInterfaceListPresent);
-
-            if (listResult == CrSuccess)
-            {
-                return HidDevicePathParser.Parse(buffer);
-            }
-
-            if (listResult != CrBufferSmall)
-            {
-                throw new InvalidOperationException($"CM_Get_Device_Interface_ListW failed with CONFIGRET {listResult}.");
-            }
+            throw new Win32Exception(Marshal.GetLastWin32Error(), "SetupDiGetClassDevsW failed.");
         }
 
-        throw new InvalidOperationException("The HID interface list changed repeatedly while it was being enumerated.");
+        var interfaces = new List<HidDeviceInterface>();
+
+        for (uint index = 0; ; index++)
+        {
+            var interfaceData = new SpDeviceInterfaceData
+            {
+                Size = Marshal.SizeOf<SpDeviceInterfaceData>(),
+            };
+
+            if (!SetupDiEnumDeviceInterfaces(deviceInfoSet, IntPtr.Zero, in interfaceClassGuid, index, ref interfaceData))
+            {
+                var error = Marshal.GetLastWin32Error();
+
+                if (error == ErrorNoMoreItems)
+                {
+                    break;
+                }
+
+                throw new Win32Exception(error, "SetupDiEnumDeviceInterfaces failed.");
+            }
+
+            interfaces.Add(GetDeviceInterface(deviceInfoSet, interfaceData));
+        }
+
+        return interfaces;
     }
 
     internal static SafeFileHandle OpenForDeviceQuery(string devicePath)
@@ -78,6 +86,21 @@ internal static partial class HidNative
         return HidD_GetAttributes(handle, ref attributes);
     }
 
+    internal static string? TryGetManufacturerString(SafeFileHandle handle)
+    {
+        return TryGetHidString(handle, HidD_GetManufacturerString);
+    }
+
+    internal static string? TryGetProductString(SafeFileHandle handle)
+    {
+        return TryGetHidString(handle, HidD_GetProductString);
+    }
+
+    internal static string? TryGetSerialNumberString(SafeFileHandle handle)
+    {
+        return TryGetHidString(handle, HidD_GetSerialNumberString);
+    }
+
     internal static bool TryGetPreparsedData(SafeFileHandle handle, out IntPtr preparsedData)
     {
         return HidD_GetPreparsedData(handle, out preparsedData);
@@ -93,22 +116,211 @@ internal static partial class HidNative
         _ = HidD_FreePreparsedData(preparsedData);
     }
 
+    private static HidDeviceInterface GetDeviceInterface(SafeDeviceInfoSetHandle deviceInfoSet, SpDeviceInterfaceData interfaceData)
+    {
+        var deviceInfoData = new SpDevInfoData
+        {
+            Size = Marshal.SizeOf<SpDevInfoData>(),
+        };
+
+        _ = SetupDiGetDeviceInterfaceDetail(
+            deviceInfoSet,
+            ref interfaceData,
+            IntPtr.Zero,
+            0,
+            out var requiredSize,
+            ref deviceInfoData);
+
+        var sizeError = Marshal.GetLastWin32Error();
+
+        if (requiredSize == 0 || sizeError != ErrorInsufficientBuffer)
+        {
+            throw new Win32Exception(sizeError, "SetupDiGetDeviceInterfaceDetailW could not determine the required buffer size.");
+        }
+
+        var detailBuffer = Marshal.AllocHGlobal(checked((int)requiredSize));
+
+        try
+        {
+            Marshal.WriteInt32(detailBuffer, IntPtr.Size == 8 ? 8 : 6);
+            deviceInfoData = new SpDevInfoData
+            {
+                Size = Marshal.SizeOf<SpDevInfoData>(),
+            };
+
+            if (!SetupDiGetDeviceInterfaceDetail(
+                    deviceInfoSet,
+                    ref interfaceData,
+                    detailBuffer,
+                    requiredSize,
+                    out _,
+                    ref deviceInfoData))
+            {
+                throw new Win32Exception(Marshal.GetLastWin32Error(), "SetupDiGetDeviceInterfaceDetailW failed.");
+            }
+
+            var devicePath = Marshal.PtrToStringUni(IntPtr.Add(detailBuffer, sizeof(int)));
+
+            if (string.IsNullOrEmpty(devicePath))
+            {
+                throw new InvalidOperationException("SetupDiGetDeviceInterfaceDetailW returned an empty device path.");
+            }
+
+            var deviceInstanceId = TryGetDeviceInstanceId(deviceInfoData.DevInst);
+            var parentDeviceInstanceId = TryGetParentDeviceInstanceId(deviceInfoData.DevInst);
+            var deviceContainerId = TryGetDeviceContainerId(deviceInfoData.DevInst);
+
+            return new HidDeviceInterface(
+                devicePath,
+                deviceInstanceId,
+                parentDeviceInstanceId,
+                deviceContainerId);
+        }
+        finally
+        {
+            Marshal.FreeHGlobal(detailBuffer);
+        }
+    }
+
+    private static string? TryGetDeviceInstanceId(uint devInst)
+    {
+        if (CM_Get_Device_ID_Size(out var characterCount, devInst, 0) != CrSuccess)
+        {
+            return null;
+        }
+
+        var buffer = new char[checked((int)characterCount + 1)];
+        return CM_Get_Device_ID(devInst, buffer, (uint)buffer.Length, 0) == CrSuccess
+            ? ToOptionalString(new string(buffer).TrimEnd('\0'))
+            : null;
+    }
+
+    private static string? TryGetParentDeviceInstanceId(uint devInst)
+    {
+        if (CM_Get_Parent(out var parentDevInst, devInst, 0) != CrSuccess)
+        {
+            return null;
+        }
+
+        return TryGetDeviceInstanceId(parentDevInst);
+    }
+
+    private static Guid? TryGetDeviceContainerId(uint devInst)
+    {
+        uint propertyType;
+        uint propertySize = 0;
+        var sizeResult = CM_Get_DevNode_Property(
+            devInst,
+            in DeviceContainerIdProperty,
+            out propertyType,
+            IntPtr.Zero,
+            ref propertySize,
+            0);
+
+        if (sizeResult != CrBufferSmall || propertySize != Marshal.SizeOf<Guid>())
+        {
+            return null;
+        }
+
+        var propertyBuffer = Marshal.AllocHGlobal(checked((int)propertySize));
+
+        try
+        {
+            var propertyResult = CM_Get_DevNode_Property(
+                devInst,
+                in DeviceContainerIdProperty,
+                out propertyType,
+                propertyBuffer,
+                ref propertySize,
+                0);
+
+            return propertyResult == CrSuccess && propertyType == DevPropTypeGuid
+                ? Marshal.PtrToStructure<Guid>(propertyBuffer)
+                : null;
+        }
+        finally
+        {
+            Marshal.FreeHGlobal(propertyBuffer);
+        }
+    }
+
+    private static string? TryGetHidString(SafeFileHandle handle, HidStringQuery query)
+    {
+        var buffer = Marshal.AllocHGlobal(checked((int)HidStringBufferLengthInBytes));
+
+        try
+        {
+            Marshal.Copy(new byte[HidStringBufferLengthInBytes], 0, buffer, checked((int)HidStringBufferLengthInBytes));
+
+            return query(handle, buffer, HidStringBufferLengthInBytes)
+                ? ToOptionalString(Marshal.PtrToStringUni(buffer))
+                : null;
+        }
+        finally
+        {
+            Marshal.FreeHGlobal(buffer);
+        }
+    }
+
+    private static string? ToOptionalString(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? null : value;
+    }
+
+    internal static bool DestroyDeviceInfoList(IntPtr handle)
+    {
+        return SetupDiDestroyDeviceInfoList(handle);
+    }
+
     [LibraryImport("hid.dll")]
     private static partial void HidD_GetHidGuid(out Guid hidGuid);
 
-    [LibraryImport("cfgmgr32.dll", EntryPoint = "CM_Get_Device_Interface_List_SizeW", StringMarshalling = StringMarshalling.Utf16)]
-    private static partial uint CM_Get_Device_Interface_List_Size(
-        out uint length,
-        in Guid interfaceClassGuid,
-        string? deviceId,
+    [LibraryImport("setupapi.dll", EntryPoint = "SetupDiGetClassDevsW", SetLastError = true, StringMarshalling = StringMarshalling.Utf16)]
+    private static partial IntPtr SetupDiGetClassDevs(
+        in Guid classGuid,
+        string? enumerator,
+        IntPtr parentWindow,
         uint flags);
 
-    [LibraryImport("cfgmgr32.dll", EntryPoint = "CM_Get_Device_Interface_ListW", StringMarshalling = StringMarshalling.Utf16)]
-    private static partial uint CM_Get_Device_Interface_List(
+    [LibraryImport("setupapi.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static partial bool SetupDiEnumDeviceInterfaces(
+        SafeDeviceInfoSetHandle deviceInfoSet,
+        IntPtr deviceInfoData,
         in Guid interfaceClassGuid,
-        string? deviceId,
-        [Out] char[] buffer,
-        uint bufferLength,
+        uint memberIndex,
+        ref SpDeviceInterfaceData deviceInterfaceData);
+
+    [LibraryImport("setupapi.dll", EntryPoint = "SetupDiGetDeviceInterfaceDetailW", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static partial bool SetupDiGetDeviceInterfaceDetail(
+        SafeDeviceInfoSetHandle deviceInfoSet,
+        ref SpDeviceInterfaceData deviceInterfaceData,
+        IntPtr deviceInterfaceDetailData,
+        uint deviceInterfaceDetailDataSize,
+        out uint requiredSize,
+        ref SpDevInfoData deviceInfoData);
+
+    [LibraryImport("setupapi.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static partial bool SetupDiDestroyDeviceInfoList(IntPtr deviceInfoSet);
+
+    [LibraryImport("cfgmgr32.dll", EntryPoint = "CM_Get_Device_ID_Size")]
+    private static partial uint CM_Get_Device_ID_Size(out uint length, uint devInst, uint flags);
+
+    [LibraryImport("cfgmgr32.dll", EntryPoint = "CM_Get_Device_IDW", StringMarshalling = StringMarshalling.Utf16)]
+    private static partial uint CM_Get_Device_ID(uint devInst, [Out] char[] buffer, uint bufferLength, uint flags);
+
+    [LibraryImport("cfgmgr32.dll", EntryPoint = "CM_Get_Parent")]
+    private static partial uint CM_Get_Parent(out uint parentDevInst, uint devInst, uint flags);
+
+    [LibraryImport("cfgmgr32.dll", EntryPoint = "CM_Get_DevNode_PropertyW")]
+    private static partial uint CM_Get_DevNode_Property(
+        uint devInst,
+        in DevPropKey propertyKey,
+        out uint propertyType,
+        IntPtr propertyBuffer,
+        ref uint propertyBufferSize,
         uint flags);
 
     [LibraryImport("kernel32.dll", EntryPoint = "CreateFileW", SetLastError = true, StringMarshalling = StringMarshalling.Utf16)]
@@ -127,6 +339,18 @@ internal static partial class HidNative
 
     [LibraryImport("hid.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
+    private static partial bool HidD_GetManufacturerString(SafeFileHandle hidDeviceObject, IntPtr buffer, uint bufferLength);
+
+    [LibraryImport("hid.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static partial bool HidD_GetProductString(SafeFileHandle hidDeviceObject, IntPtr buffer, uint bufferLength);
+
+    [LibraryImport("hid.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static partial bool HidD_GetSerialNumberString(SafeFileHandle hidDeviceObject, IntPtr buffer, uint bufferLength);
+
+    [LibraryImport("hid.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
     private static partial bool HidD_GetPreparsedData(SafeFileHandle hidDeviceObject, out IntPtr preparsedData);
 
     [LibraryImport("hid.dll", SetLastError = true)]
@@ -135,6 +359,58 @@ internal static partial class HidNative
 
     [LibraryImport("hid.dll")]
     private static partial int HidP_GetCaps(IntPtr preparsedData, out HidpCaps capabilities);
+}
+
+internal sealed class SafeDeviceInfoSetHandle : SafeHandleZeroOrMinusOneIsInvalid
+{
+    internal SafeDeviceInfoSetHandle()
+        : base(ownsHandle: true)
+    {
+    }
+
+    internal static SafeDeviceInfoSetHandle FromRawHandle(IntPtr rawHandle)
+    {
+        var handle = new SafeDeviceInfoSetHandle();
+        handle.SetHandle(rawHandle);
+        return handle;
+    }
+
+    protected override bool ReleaseHandle()
+    {
+        return HidNative.DestroyDeviceInfoList(handle);
+    }
+}
+
+[StructLayout(LayoutKind.Sequential)]
+internal struct SpDeviceInterfaceData
+{
+    internal int Size;
+    internal Guid InterfaceClassGuid;
+    internal int Flags;
+    internal IntPtr Reserved;
+}
+
+[StructLayout(LayoutKind.Sequential)]
+internal struct SpDevInfoData
+{
+    internal int Size;
+    internal Guid ClassGuid;
+    internal uint DevInst;
+    internal IntPtr Reserved;
+}
+
+[StructLayout(LayoutKind.Sequential)]
+internal readonly struct DevPropKey
+{
+    internal DevPropKey(Guid formatId, uint propertyId)
+    {
+        FormatId = formatId;
+        PropertyId = propertyId;
+    }
+
+    internal Guid FormatId { get; }
+
+    internal uint PropertyId { get; }
 }
 
 [StructLayout(LayoutKind.Sequential)]
@@ -182,3 +458,11 @@ internal struct HidpCaps
     internal ushort NumberFeatureValueCaps;
     internal ushort NumberFeatureDataIndices;
 }
+
+internal delegate bool HidStringQuery(SafeFileHandle handle, IntPtr buffer, uint bufferLength);
+
+internal sealed record HidDeviceInterface(
+    string DevicePath,
+    string? DeviceInstanceId,
+    string? ParentDeviceInstanceId,
+    Guid? DeviceContainerId);

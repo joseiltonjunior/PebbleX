@@ -5,4 +5,10 @@ public sealed record HidCollectionInfo(
     ushort? VendorId,
     ushort? ProductId,
     ushort? UsagePage,
-    ushort? Usage);
+    ushort? Usage,
+    string? Manufacturer,
+    string? Product,
+    string? SerialNumber,
+    string? DeviceInstanceId,
+    string? ParentDeviceInstanceId,
+    Guid? DeviceContainerId);

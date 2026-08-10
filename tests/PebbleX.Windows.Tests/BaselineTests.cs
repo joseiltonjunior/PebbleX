@@ -11,10 +11,21 @@ public sealed class BaselineTests
     }
 
     [Fact]
-    public void Parse_StopsAtTheMultiStringTerminator()
+    public void TryParseVendor_AcceptsFourHexDigits()
     {
-        var paths = HidDevicePathParser.Parse("path-one\0path-two\0\0ignored".ToCharArray());
+        var parsed = HidCollectionFilter.TryParseVendor("046D", out var vendorId);
 
-        Assert.Equal(["path-one", "path-two"], paths);
+        Assert.True(parsed);
+        Assert.Equal(0x046D, vendorId);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("46D")]
+    [InlineData("046D0")]
+    [InlineData("logi")]
+    public void TryParseVendor_RejectsInvalidInput(string value)
+    {
+        Assert.False(HidCollectionFilter.TryParseVendor(value, out _));
     }
 }
