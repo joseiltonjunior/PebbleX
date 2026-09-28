@@ -12,6 +12,7 @@ internal static partial class HidNative
     private const uint DigcfPresent = 0x00000002;
     private const uint DigcfDeviceInterface = 0x00000010;
     private const uint GenericRead = 0x80000000;
+    private const uint GenericWrite = 0x40000000;
     private const uint FileShareRead = 0x00000001;
     private const uint FileShareWrite = 0x00000002;
     private const uint OpenExisting = 3;
@@ -94,6 +95,10 @@ internal static partial class HidNative
             flagsAndAttributes: FileFlagOverlapped,
             templateFile: IntPtr.Zero);
     }
+    internal static SafeFileHandle OpenForDiagnosticQueries(string devicePath) => CreateFile(
+        devicePath, GenericRead | GenericWrite, FileShareRead | FileShareWrite,
+        IntPtr.Zero, OpenExisting, FileFlagOverlapped, IntPtr.Zero);
+
     internal static bool TryGetAttributes(SafeFileHandle handle, ref HiddAttributes attributes)
     {
         return HidD_GetAttributes(handle, ref attributes);

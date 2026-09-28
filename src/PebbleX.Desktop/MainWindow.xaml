@@ -1,0 +1,171 @@
+<Window x:Class="PebbleX.Desktop.MainWindow"
+ xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+ xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+ Title="PebbleX" Width="1060" Height="720" MinWidth="840" MinHeight="600"
+ Background="#F3F5F8" FontFamily="Segoe UI" FontSize="14" Foreground="#192638"
+ WindowStartupLocation="CenterScreen" Loaded="Window_Loaded" Closing="Window_Closing">
+ <Window.Resources>
+  <Style TargetType="Button">
+   <Setter Property="Padding" Value="16,9" /><Setter Property="Margin" Value="0,0,8,0" />
+   <Setter Property="Background" Value="White" /><Setter Property="Foreground" Value="#192638" />
+   <Setter Property="BorderBrush" Value="#C8D1DD" /><Setter Property="Cursor" Value="Hand" />
+   <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Button">
+    <Border x:Name="Surface" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
+      BorderThickness="1" CornerRadius="6" Padding="{TemplateBinding Padding}">
+     <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+    </Border>
+    <ControlTemplate.Triggers>
+     <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Surface" Property="Opacity" Value="0.8" /></Trigger>
+     <Trigger Property="IsEnabled" Value="False"><Setter TargetName="Surface" Property="Opacity" Value="0.4" /></Trigger>
+    </ControlTemplate.Triggers>
+   </ControlTemplate></Setter.Value></Setter>
+  </Style>
+ </Window.Resources>
+ <Grid Margin="28">
+  <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions>
+  <Grid Margin="0,0,0,22">
+   <StackPanel><TextBlock Text="PebbleX" FontSize="30" FontWeight="SemiBold" />
+    <TextBlock Text="Teclado e mouse, juntos" Foreground="#59697C" Margin="0,3,0,0" /></StackPanel>
+   <Button x:Name="DeveloperModeButton" Content="Modo desenvolvedor" HorizontalAlignment="Right" VerticalAlignment="Center"
+     Click="DeveloperMode_Click" ToolTip="Abrir captura, relatórios e controles de diagnóstico" />
+  </Grid>
+
+  <Grid x:Name="HomeSurface" Grid.Row="1">
+   <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions>
+   <Border x:Name="FlowCard" Background="White" CornerRadius="12" Padding="24" BorderBrush="#DEE4EC" BorderThickness="1">
+    <StackPanel>
+     <TextBlock Text="Flow" FontSize="22" FontWeight="SemiBold" />
+     <TextBlock Text="Use os botões Easy-Switch do teclado. O PebbleX acompanha o mouse quando a sincronização estiver configurada."
+       Foreground="#59697C" TextWrapping="Wrap" Margin="0,5,0,18" />
+     <Grid>
+      <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+      <Border Background="#F3F5F8" CornerRadius="8" Padding="16">
+       <StackPanel><TextBlock Text="TECLADO" Foreground="#64748B" FontSize="11" FontWeight="SemiBold" />
+        <TextBlock x:Name="KeyboardSummary" Text="Procurando teclado…" FontSize="16" FontWeight="SemiBold" Margin="0,5,0,0" />
+        <TextBlock Text="Easy-Switch" Foreground="#64748B" Margin="0,3,0,0" /></StackPanel>
+      </Border>
+      <TextBlock Grid.Column="1" Text="↔" FontSize="24" Foreground="#2563EB" VerticalAlignment="Center" Margin="18,0" />
+      <Border Grid.Column="2" Background="#F3F5F8" CornerRadius="8" Padding="16">
+       <StackPanel><TextBlock Text="MOUSE" Foreground="#64748B" FontSize="11" FontWeight="SemiBold" />
+        <TextBlock x:Name="MouseSummary" Text="Procurando mouse…" FontSize="16" FontWeight="SemiBold" Margin="0,5,0,0" />
+        <TextBlock Text="Acompanhamento pelo PebbleX" Foreground="#64748B" Margin="0,3,0,0" /></StackPanel>
+      </Border>
+     </Grid>
+     <DockPanel Margin="0,18,0,0">
+      <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+       <Button x:Name="LinkComputerButton" Content="Vincular computador" Click="LinkComputer_Click" />
+       <Button x:Name="FlowButton" Content="Ativar Flow" Background="#2563EB" Foreground="White" BorderBrush="#2563EB" IsEnabled="False" Click="Flow_Click"
+         ToolTip="Monitora a chegada do teclado, move o mouse pelo PC pareado e aguarda confirmação no destino." />
+      </StackPanel>
+      <TextBlock x:Name="FlowStatusText" Text="Flow entre computadores ainda não configurado" Foreground="#8A4B10"
+        VerticalAlignment="Center" TextWrapping="Wrap" />
+     </DockPanel>
+    </StackPanel>
+   </Border>
+   <Border x:Name="PeerInfoPanel" Grid.Row="1" Background="#EAF0F8" CornerRadius="8" Padding="16" Margin="0,16,0,0">
+    <StackPanel><TextBlock Text="Para usar em dois computadores" FontWeight="SemiBold" />
+     <TextBlock Text="Abra Vincular computador nos dois PCs, confirme o mesmo código de segurança e depois ative o Flow. O PebbleX salva o vínculo e atualiza o endereço local automaticamente durante o pareamento."
+       Foreground="#59697C" TextWrapping="Wrap" Margin="0,5,0,0" /></StackPanel>
+   </Border>
+   <Border x:Name="LinkPanel" Grid.Row="0" Grid.RowSpan="4" Background="White" CornerRadius="10" Padding="20" Margin="0,0,0,0"
+     BorderBrush="#DEE4EC" BorderThickness="1" Visibility="Collapsed">
+   <StackPanel>
+     <DockPanel Margin="0,0,0,4">
+      <Button Content="Voltar ao Flow" DockPanel.Dock="Right" Click="LinkComputer_Click" Margin="8,0,0,0"
+        ToolTip="Fechar a configuração de vínculo e voltar à tela principal" />
+      <TextBlock Text="Vincular este PC a outro PebbleX" FontSize="18" FontWeight="SemiBold" VerticalAlignment="Center" />
+     </DockPanel>
+     <TextBlock Text="Abra esta tela nos dois PCs com o Flow pausado. O PebbleX encontra computadores na rede local; confirme o mesmo código de segurança nas duas telas para vincular."
+       Foreground="#59697C" TextWrapping="Wrap" Margin="0,5,0,14" />
+     <DockPanel Margin="0,0,0,8">
+      <Button x:Name="SearchPeersButton" Content="Buscar computadores" DockPanel.Dock="Right" Click="SearchPeers_Click" />
+      <TextBlock x:Name="DiscoveryStatusText" Text="A busca começa quando esta tela é aberta." Foreground="#59697C" VerticalAlignment="Center" TextWrapping="Wrap" />
+     </DockPanel>
+     <ListBox x:Name="DiscoveredPeersList" Height="132" DisplayMemberPath="Label" SelectionChanged="DiscoveredPeers_SelectionChanged"
+       AutomationProperties.Name="Computadores PebbleX encontrados" />
+     <DockPanel Margin="0,10,0,16">
+      <Button x:Name="PairSelectedButton" Content="Vincular computador selecionado" DockPanel.Dock="Right"
+        Click="PairSelected_Click" IsEnabled="False" />
+      <TextBlock Text="O vínculo usa um código temporário; a chave é criada automaticamente e protegida pelo Windows."
+        Foreground="#59697C" VerticalAlignment="Center" TextWrapping="Wrap" />
+     </DockPanel>
+     <TextBlock x:Name="PairingResultText" Foreground="#276749" TextWrapping="Wrap" Margin="0,0,0,12" />
+     <Expander Header="Configuração manual (avançado)" IsExpanded="False">
+      <StackPanel Margin="0,12,0,0">
+       <TextBlock Text="Use estes campos somente se a descoberta automática não funcionar. Configure os mesmos dados nos dois PCs."
+         Foreground="#59697C" TextWrapping="Wrap" Margin="0,0,0,12" />
+       <Grid>
+      <Grid.ColumnDefinitions><ColumnDefinition Width="150" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+      <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+      <TextBlock Text="ID deste PC" VerticalAlignment="Center" Margin="0,0,10,8" />
+      <TextBox x:Name="LocalInstallationIdText" Grid.Column="1" IsReadOnly="True" Padding="8,6" Margin="0,0,8,8" />
+      <Button Grid.Column="2" Content="Copiar ID" Click="CopyLocalId_Click" Margin="0,0,0,8" />
+      <TextBlock Grid.Row="1" Text="ID do outro PC" VerticalAlignment="Center" Margin="0,0,10,8" />
+      <TextBox x:Name="PeerInstallationIdInput" Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2" Padding="8,6" Margin="0,0,0,8" />
+      <TextBlock Grid.Row="2" Text="Nome do outro PC" VerticalAlignment="Center" Margin="0,0,10,8" />
+      <TextBox x:Name="PeerNameInput" Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="2" Padding="8,6" Margin="0,0,0,8" />
+      <TextBlock Grid.Row="3" Text="Endereço IP" VerticalAlignment="Center" Margin="0,0,10,8" />
+      <TextBox x:Name="PeerAddressInput" Grid.Row="3" Grid.Column="1" Grid.ColumnSpan="2" Padding="8,6" Margin="0,0,0,8" />
+      <TextBlock Grid.Row="4" Text="Chave compartilhada" VerticalAlignment="Center" Margin="0,0,10,0" />
+      <PasswordBox x:Name="FlowKeyInput" Grid.Row="4" Grid.Column="1" Padding="8,6" Margin="0,0,8,0" />
+      <Button x:Name="GenerateFlowKeyButton" Grid.Row="4" Grid.Column="2" Content="Gerar e copiar chave" Click="GenerateFlowKey_Click" Margin="0" />
+       </Grid>
+       <DockPanel Margin="0,14,0,0">
+        <Button Content="Salvar vínculo manual" DockPanel.Dock="Right" Click="SaveFlowLink_Click" Margin="0" />
+        <TextBlock x:Name="LinkStatusText" Text="O vínculo manual continua disponível como alternativa." Foreground="#59697C" VerticalAlignment="Center" TextWrapping="Wrap" />
+       </DockPanel>
+      </StackPanel>
+     </Expander>
+    </StackPanel>
+   </Border>
+   <TextBlock x:Name="HomeFooter" Grid.Row="3" Text="A captura de diagnóstico continua disponível no modo desenvolvedor."
+     Foreground="#718096" VerticalAlignment="Bottom" Margin="0,16,0,0" />
+  </Grid>
+
+  <Grid x:Name="DeveloperSurface" Grid.Row="1" Visibility="Collapsed">
+   <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" />
+    <RowDefinition Height="*" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+   <Border Grid.Row="0" Background="White" CornerRadius="10" Padding="20" BorderBrush="#DEE4EC" BorderThickness="1">
+    <StackPanel>
+     <TextBlock Text="Dispositivo para observar" FontWeight="SemiBold" Margin="0,0,0,8" />
+     <DockPanel><Button x:Name="RefreshButton" Content="Atualizar" DockPanel.Dock="Right" Margin="12,0,0,0" Click="Refresh_Click" />
+      <ComboBox x:Name="DevicePicker" MinHeight="40" VerticalContentAlignment="Center" DisplayMemberPath="Label"
+       SelectionChanged="DevicePicker_SelectionChanged" AutomationProperties.Name="Dispositivo para observar" /></DockPanel>
+     <TextBlock x:Name="DeviceDetails" Text="Buscando dispositivos Logitech…" Foreground="#59697C" TextWrapping="Wrap" Margin="0,10,0,14" />
+     <WrapPanel>
+      <Button x:Name="StartButton" Content="Iniciar captura" Background="#2563EB" Foreground="White" BorderBrush="#2563EB" Click="Start_Click" IsEnabled="False" />
+      <Button x:Name="StopButton" Content="Parar captura" Click="Stop_Click" IsEnabled="False" />
+      <Button x:Name="QueryButton" Content="Consultar canal" Click="Query_Click" IsEnabled="False" ToolTip="Consulta o dispositivo conectado, sem trocar seu canal. Pare a captura antes de consultar." />
+      <Button x:Name="EnableAnalyticsButton" Content="Ativar eventos Easy-Switch" Click="EnableAnalytics_Click" IsEnabled="False" ToolTip="Ativa somente o relatório temporário dos botões Easy-Switch do teclado B377; não desvia nem remapeia teclas." />
+      <Button x:Name="DisableAnalyticsButton" Content="Desativar eventos" Click="DisableAnalytics_Click" IsEnabled="False" ToolTip="Desativa somente o relatório temporário; mantém o mapeamento original do teclado." />
+      <TextBlock Text="Mouse B034 → canal" VerticalAlignment="Center" Margin="8,0,6,0" Foreground="#59697C" />
+      <ComboBox x:Name="MouseTargetChannel" Width="64" Height="38" SelectedIndex="0" VerticalContentAlignment="Center" AutomationProperties.Name="Canal de destino do mouse">
+       <ComboBoxItem Content="1" /><ComboBoxItem Content="2" /><ComboBoxItem Content="3" />
+      </ComboBox>
+      <Button x:Name="SetMouseChannelButton" Content="Mover mouse" Click="SetMouseChannel_Click" IsEnabled="False" ToolTip="Envia ChangeHost ao mouse B034 conectado. Consulte o canal após reconectar." />
+     </WrapPanel>
+     <TextBlock x:Name="ChannelText" Text="Canal desconhecido · consulte com o dispositivo conectado." TextWrapping="Wrap" Foreground="#59697C" Margin="0,12,0,0" />
+    </StackPanel>
+   </Border>
+   <Grid Grid.Row="1" Margin="0,18,0,12"><Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+    <TextBlock x:Name="StatusText" Text="Parado" FontWeight="SemiBold" VerticalAlignment="Center" TextWrapping="Wrap" />
+    <TextBlock x:Name="CountersText" Grid.Column="1" Text="00:00 · 0 relatórios" FontFamily="Consolas" Foreground="#59697C" VerticalAlignment="Center" />
+   </Grid>
+   <Border Grid.Row="2" Grid.RowSpan="2" Background="#101C2C" CornerRadius="10" Padding="16">
+    <Grid><Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+     <DockPanel Margin="0,0,0,10"><CheckBox x:Name="AutoScroll" Content="Acompanhar final" IsChecked="True" Foreground="#BDCBE0" DockPanel.Dock="Right" VerticalAlignment="Center" />
+      <TextBlock Text="REGISTRO AO VIVO" Foreground="#93A9C5" FontSize="12" FontWeight="SemiBold" /></DockPanel>
+     <TextBox x:Name="LogBox" Grid.Row="1" IsReadOnly="True" AcceptsReturn="True" TextWrapping="NoWrap" Background="Transparent" Foreground="#D8E7FA" BorderThickness="0" FontFamily="Consolas" FontSize="12" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" AutomationProperties.Name="Registro da captura" />
+     <TextBlock Grid.Row="2" Text="Horário local · últimos 1.000 registros · saída/retorno não identificam o canal" Foreground="#93A9C5" FontSize="11" Margin="0,10,0,0" />
+    </Grid>
+   </Border>
+   <StackPanel Grid.Row="4" Margin="0,16,0,0">
+    <TextBlock Text="Anotar ação no registro (ex.: teclado 1 → 2)" Foreground="#59697C" FontSize="12" Margin="0,0,0,6" />
+    <DockPanel Margin="0,0,0,12"><Button Content="Marcar evento" Click="Mark_Click" DockPanel.Dock="Right" Margin="10,0,0,0" />
+     <TextBox x:Name="MarkerText" VerticalContentAlignment="Center" Padding="10,6" MaxLength="200" ToolTip="Ex.: teclado 1 → 2" AutomationProperties.Name="Descrição do evento" /></DockPanel>
+    <DockPanel><Button Content="Voltar" Click="DeveloperMode_Click" DockPanel.Dock="Right" Margin="0" />
+     <StackPanel Orientation="Horizontal"><Button Content="Salvar registro…" Click="Save_Click" /><Button Content="Limpar registro" Click="Clear_Click" /></StackPanel></DockPanel>
+   </StackPanel>
+  </Grid>
+ </Grid>
+</Window>
